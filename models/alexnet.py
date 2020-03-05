@@ -23,8 +23,8 @@ class alexnet(nn.Module):
 
     def forward(self, x, layer=8):
         l, ab = torch.split(x, [1, 2], dim=1)
-        feat_l = self.l_to_ab(l, layer)
-        feat_ab = self.ab_to_l(ab, layer)
+        feat_l = self.l_to_ab(l, layer) # [batchsize,128]
+        feat_ab = self.ab_to_l(ab, layer) # [batchsize,128]
         return feat_l, feat_ab
 
 

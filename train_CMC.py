@@ -155,14 +155,19 @@ def get_train_loader(args):
         train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
         num_workers=args.num_workers, pin_memory=True, sampler=train_sampler)
 
-    # num of samples
+    # num of all data samples
     n_data = len(train_dataset)
     print('number of samples: {}'.format(n_data))
 
-    return train_loader, n_data
+    return train_loader, n_data #
 
 
 def set_model(args, n_data):
+    """
+    :param args:
+    :param n_data: # num of all data samples
+    :return:
+    """
     # set the model
     if args.model == 'alexnet':
         model = MyAlexNetCMC(args.feat_dim)
@@ -196,7 +201,16 @@ def set_optimizer(args, model):
 
 def train(epoch, train_loader, model, contrast, criterion_l, criterion_ab, optimizer, opt):
     """
-    one epoch training
+
+    :param epoch:
+    :param train_loader:
+    :param model:
+    :param contrast: NCEAverage
+    :param criterion_l:
+    :param criterion_ab:
+    :param optimizer:
+    :param opt:
+    :return:
     """
     model.train()
     contrast.train()
@@ -220,13 +234,13 @@ def train(epoch, train_loader, model, contrast, criterion_l, criterion_ab, optim
             inputs = inputs.cuda()
 
         # ===================forward=====================
-        feat_l, feat_ab = model(inputs)
+        feat_l, feat_ab = model(inputs) # [batchsize , 128] * 2, z_1 , z_2
         out_l, out_ab = contrast(feat_l, feat_ab, index)
 
         l_loss = criterion_l(out_l)
         ab_loss = criterion_ab(out_ab)
-        l_prob = out_l[:, 0].mean()
-        ab_prob = out_ab[:, 0].mean()
+        # l_prob = out_l[:, 0].mean() # 用于日志输出
+        # ab_prob = out_ab[:, 0].mean() # 用于日志输出
 
         loss = l_loss + ab_loss
 

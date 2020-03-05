@@ -7,20 +7,41 @@ import math
 class NCEAverage(nn.Module):
 
     def __init__(self, inputSize, outputSize, K, T=0.07, momentum=0.5, use_softmax=False):
+        """
+
+        :param inputSize: 向量大小 feat_xx.shape[1]
+        :param outputSize:   # num of all data samples
+        :param K:
+        :param T:
+        :param momentum:
+        :param use_softmax:
+        """
+
         super(NCEAverage, self).__init__()
         self.nLem = outputSize
         self.unigrams = torch.ones(self.nLem)
-        self.multinomial = AliasMethod(self.unigrams)
+        self.multinomial = AliasMethod(self.unigrams) # 采样方法
         self.multinomial.cuda()
         self.K = K
         self.use_softmax = use_softmax
 
         self.register_buffer('params', torch.tensor([K, T, -1, -1, momentum]))
         stdv = 1. / math.sqrt(inputSize / 3)
+
+        # weight_{1,2}  [总样本数，128]
         self.register_buffer('memory_l', torch.rand(outputSize, inputSize).mul_(2 * stdv).add_(-stdv))
         self.register_buffer('memory_ab', torch.rand(outputSize, inputSize).mul_(2 * stdv).add_(-stdv))
 
     def forward(self, l, ab, y, idx=None):
+        """
+
+        :param l:
+        :param ab:
+        :param y: l 和 ab 样本所对应在数据集中的 index， (batchsize,)
+        :param idx:
+        :return:
+        """
+
         K = int(self.params[0].item())
         T = self.params[1].item()
         Z_l = self.params[2].item()
@@ -33,16 +54,20 @@ class NCEAverage(nn.Module):
 
         # score computation
         if idx is None:
+            # 对所有样本的下标进行采样，得到 [batchsize,K+1] 的样本下标矩阵
             idx = self.multinomial.draw(batchSize * (self.K + 1)).view(batchSize, -1)
+            # 将 采样idx[:,0] 赋值为 l和ab对应样本的下标，也即构造 [(1+K),_ ] 的采样序列
             idx.select(1, 0).copy_(y.data)
-        # sample
+
+        # 根据idx所有采样结果对 memory_l 进行采样，得到 [batchsize*(K+1),128] 的矩阵
         weight_l = torch.index_select(self.memory_l, 0, idx.view(-1)).detach()
-        weight_l = weight_l.view(batchSize, K + 1, inputSize)
-        out_ab = torch.bmm(weight_l, ab.view(batchSize, inputSize, 1))
+        weight_l = weight_l.view(batchSize, K + 1, inputSize) # reshape
+        out_ab = torch.bmm(weight_l, ab.view(batchSize, inputSize, 1)) # [batchsize,K+1,1]
+
         # sample
         weight_ab = torch.index_select(self.memory_ab, 0, idx.view(-1)).detach()
         weight_ab = weight_ab.view(batchSize, K + 1, inputSize)
-        out_l = torch.bmm(weight_ab, l.view(batchSize, inputSize, 1))
+        out_l = torch.bmm(weight_ab, l.view(batchSize, inputSize, 1)) # [batchsize,K+1,1]
 
         if self.use_softmax:
             out_ab = torch.div(out_ab, T)
